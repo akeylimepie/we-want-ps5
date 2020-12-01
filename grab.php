@@ -13,7 +13,7 @@ if (!$allStores) {
     throw new Exception('No data received');
 }
 
-$russiaStores = array_filter($allStores, fn(array $store) => $store['country'] ?? '' === 'Russia');
+$russiaStores = array_filter($allStores, fn(array $store) => strpos($store['price'], 'RUB'));
 
 $available = array_values(array_filter($russiaStores, fn(array $store) => $store['status'] !== 'OUT_OF_STOCK'));
 
