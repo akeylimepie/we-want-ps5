@@ -7,15 +7,33 @@ include __DIR__.'/src/Telegram.php';
 $data = new Data();
 $cache = new Cache();
 
-$allStores = $data->retrieve();
+$shops = $data->retrieve();
 
-if (!$allStores) {
+if (!$shops) {
     throw new Exception('No data received');
+} else {
+    var_dump($shops);
 }
 
-$russiaStores = array_filter($allStores, fn(array $store) => strpos($store['price'], 'RUB'));
+$normalPrefix = 'normal';
+$digitalPrefix = 'digital';
 
-$available = array_values(array_filter($russiaStores, fn(array $store) => $store['status'] !== 'OUT_OF_STOCK'));
+$available = [];
+
+foreach ($shops as $shop) {
+    $shopName = $shop['name'];
+
+    foreach (
+        [
+            $normalPrefix,
+            $digitalPrefix,
+        ] as $prefix
+    ) {
+        if ($shop["{$prefix}_info"]['available'] ?? false) {
+            $available[$shopName][$prefix] ??= $shop["{$prefix}_link"];
+        }
+    }
+}
 
 if ($cache->pull() === $available) {
     echo "Same";
@@ -25,40 +43,23 @@ if ($cache->pull() === $available) {
 $cache->push($available);
 
 if ($available) {
-    $format = function (array $stores) {
-        return array_map(fn(array $store) => sprintf("%s: %s", $store['site'], $store['url']), $stores);
-    };
-
-    $stores = array_unique(array_reduce($available, fn($stack, $store) => [...$stack, $store['site']], []));
-
-    $ps5 = $data->filterByTitle($available, 'playstation 5');
-    $ps5_digital = $data->filterByTitle($available, 'playstation 5 digital');
-
     $message = "";
 
-    $ps5_icon = "💿";
-    $ps5_digital_icon = "🌐";
+    foreach ($available as $shopName => $shopData) {
+        $list = [];
 
-    $ps5 && $message .= $ps5_icon;
-    $ps5_digital && $message .= $ps5_digital_icon;
-    $message .= " — можно заказать\n\n";
-
-    foreach ($stores as $storeTitle) {
-        $message .= "$storeTitle: ";
-
-        if (isset($ps5[$storeTitle])) {
-            $message .= sprintf("[%s %s](%s)", $ps5_icon, 'с диском', $ps5[$storeTitle]['url']);
+        foreach (
+            [
+                $normalPrefix => '💿 с диском',
+                $digitalPrefix => '🌐 без диска',
+            ] as $prefix => $caption
+        ) {
+            if (isset($shopData[$prefix])) {
+                $list[] = sprintf("[%s](%s)", $caption, $shopData[$prefix]);
+            }
         }
 
-        if (isset($ps5[$storeTitle]) && isset($ps5_digital[$storeTitle])) {
-            $message .= " ";
-        }
-
-        if (isset($ps5_digital[$storeTitle])) {
-            $message .= sprintf("[%s %s](%s)", $ps5_digital_icon, 'без диска', $ps5_digital[$storeTitle]['url']);
-        }
-
-        $message .= "\n\n";
+        $message .= sprintf("%s: %s\n\n", $shopName, implode(', ', $list));
     }
 } else {
     $message = 'А всё уже, раньше надо было';
