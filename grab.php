@@ -64,5 +64,11 @@ if ($available) {
     $message = 'А всё уже, раньше надо было';
 }
 
-$telegram = new Telegram();
-$telegram->sendMessage($message);
+$options = getopt('s');
+
+if (isset($options['s'])) {
+    echo $message;
+} else {
+    $telegram = new Telegram();
+    $telegram->sendMessage($message);
+}
